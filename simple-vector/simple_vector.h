@@ -6,6 +6,8 @@
 #include <iterator>
 #include <utility>
 
+#include "array_ptr.h"
+
 struct ReserveProxyObj {
     size_t to_reserve = 0;
 
@@ -56,7 +58,7 @@ public:
     }
 
     SimpleVector(SimpleVector&& dimple) :
-        items_(std::exchange(dimple.items_, nullptr)),
+        items_(std::move(dimple.items_)),
         size_(std::exchange(dimple.size_, 0)),
         capacity_(std::exchange(dimple.capacity_, 0))
     {}
@@ -78,11 +80,13 @@ public:
 
     // Возвращает ссылку на элемент с индексом index
     Type& operator[](size_t index) noexcept {
+        assert((index < size_) && (index >= 0));
         return items_[index];
     }
 
     // Возвращает константную ссылку на элемент с индексом index
     const Type& operator[](size_t index) const noexcept {
+        assert((index < size_) && (index >= 0));
         return items_[index];
     }
 
@@ -111,13 +115,13 @@ public:
 
     void Reserve(size_t new_capacity) {
         if (new_capacity > capacity_) {
-            Type* new_array = new Type[new_capacity]{ 0 };
-            if (items_) {
-                std::move(begin(), end(), new_array);
+            ArrayPtr<Type> new_array(new_capacity);
+            if (items_.Get()) {
+                std::move(begin(), end(), new_array.begin());
             }
             capacity_ = new_capacity;
-            delete[] items_;
-            items_ = new_array;
+            items_.~ArrayPtr();
+            items_ = std::move(new_array);
         }
     }
 
@@ -131,49 +135,46 @@ public:
     // Возвращает итератор на начало массива
     // Для пустого массива может быть равен (или не равен) nullptr
     Iterator begin() noexcept {
-        return items_;
+        return items_.begin();
     }
 
     // Возвращает итератор на элемент, следующий за последним
     // Для пустого массива может быть равен (или не равен) nullptr
     Iterator end() noexcept {
-        return items_ + size_;
+        return items_.begin() + size_;
     }
 
     // Возвращает константный итератор на начало массива
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator begin() const noexcept {
-        return items_;
+        return items_.begin();
     }
 
     // Возвращает итератор на элемент, следующий за последним
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator end() const noexcept {
-        return items_ + size_;
+        return items_.begin() + size_;
     }
 
     // Возвращает константный итератор на начало массива
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator cbegin() const noexcept {
-        return items_;
+        return items_.begin();
     }
 
     // Возвращает итератор на элемент, следующий за последним
     // Для пустого массива может быть равен (или не равен) nullptr
     ConstIterator cend() const noexcept {
-        return items_ + size_;
+        return items_.begin() + size_;
     }
 
-    ~SimpleVector() {
-        delete[] items_;
-    }
+    ~SimpleVector() {}
 
     SimpleVector& operator=(SimpleVector&& dimple) {
         if (items_ != dimple.items_) {
-            Type* tmp_items = new Type[dimple.capacity_]{ 0 };
-            std::move(dimple.begin(), dimple.end(), tmp_items);
-            delete[] items_;
-            items_ = tmp_items;
+            ArrayPtr<Type> tmp_items = std::move(dimple.items_);
+            items_.~ArrayPtr();
+            items_ = std::move(tmp_items);
             size_ = dimple.size_;
             capacity_ = dimple.capacity_;
         }
@@ -193,6 +194,7 @@ public:
     }
 
     Iterator Insert(ConstIterator pos, Type&& value) {
+        assert((pos >= begin()) && (pos <= end()));
         size_t insert_index = GetIndex(pos);
         if (size_ == capacity_) {
             Reserve(std::max(capacity_ * 2, size_t(1)));
@@ -204,6 +206,7 @@ public:
     }
 
     Iterator Insert(ConstIterator pos, const Type& value) {
+        assert((pos >= begin()) && (pos <= end()));
         size_t insert_index = GetIndex(pos);
         if (size_ == capacity_) {
             Reserve(std::max(capacity_ * 2, size_t(1)));
@@ -223,10 +226,13 @@ public:
     }
 
     void PopBack() noexcept {
-        --size_;
+        if (size_) {
+            --size_;
+        }
     }
 
     Iterator Erase(ConstIterator pos) {
+        assert((pos >= begin()) && (pos <= end()));
         std::move(begin() + GetIndex(pos) + 1, end()+1, begin() + GetIndex(pos));
         --size_;
         return const_cast<Type*>(pos);
@@ -239,7 +245,7 @@ public:
     }
 
 private:
-    Type* items_ = nullptr;
+    ArrayPtr<Type> items_;
 
     size_t size_ = 0;
     size_t capacity_ = 0;
@@ -251,7 +257,7 @@ private:
     }
 
 	void Initialize(size_t size) {
-		items_ = new Type[size]{ 0 };
+		items_ = ArrayPtr<Type>(size);
 		size_ = size;
 		capacity_ = size;
 	}
