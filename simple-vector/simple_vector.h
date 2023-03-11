@@ -120,7 +120,6 @@ public:
                 std::move(begin(), end(), new_array.begin());
             }
             capacity_ = new_capacity;
-            items_.~ArrayPtr();
             items_ = std::move(new_array);
         }
     }
@@ -249,12 +248,6 @@ private:
 
     size_t size_ = 0;
     size_t capacity_ = 0;
-
-    void ChangeCapacity(size_t new_capacity) {
-        size_t old_size = size_;
-        Resize(new_capacity);
-        Resize(old_size);
-    }
 
 	void Initialize(size_t size) {
 		items_ = ArrayPtr<Type>(size);

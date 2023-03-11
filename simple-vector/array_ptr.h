@@ -38,7 +38,9 @@ public:
     ArrayPtr& operator=(const ArrayPtr&) = delete;
 
     ArrayPtr& operator=(ArrayPtr&& other) {
-        raw_ptr_ = std::exchange(other.raw_ptr_, nullptr);
+        if (this != &other) {
+            std::swap(raw_ptr_, other.raw_ptr_);
+        }
         return *this;
     }
 
@@ -76,9 +78,7 @@ public:
 
     // Обменивается значениям указателя на массив с объектом other
     void swap(ArrayPtr& other) noexcept {
-        Type* tmp_ptr = other.raw_ptr_;
-        other.raw_ptr_ = raw_ptr_;
-        raw_ptr_ = tmp_ptr;
+        std::swap(raw_ptr_, other.raw_ptr_);
     }
 
     Iterator begin() noexcept {
